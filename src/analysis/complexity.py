@@ -2,8 +2,13 @@ import ast
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
 import logging
+try:
+    from schemas.extraction_config import ContextMetrics
+except ImportError:
+    # Fallback if run as script without package context
+    sys.path.append(str(Path(__file__).parents[2]))
+    from schemas.extraction_config import ContextMetrics
 
 # Configure structured logging
 logging.basicConfig(
@@ -11,22 +16,6 @@ logging.basicConfig(
     format='{"level": "%(levelname)s", "module": "complexity_analysis", "message": "%(message)s"}'
 )
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ComplexityMetrics:
-    """
-    Data model for file complexity metrics.
-    """
-    file_path: str
-    loc: int = 0
-    function_count: int = 0
-    class_count: int = 0
-    cyclomatic_complexity: int = 1
-    docstring_coverage: float = 0.0
-    context_richness: float = 0.0
-    
-    def to_dict(self):
-        return asdict(self)
 
 class CodeComplexityAnalyzer:
     """
@@ -39,7 +28,7 @@ class CodeComplexityAnalyzer:
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path).resolve()
 
-    def analyze_file(self, file_path: Path) -> Optional[ComplexityMetrics]:
+    def analyze_file(self, file_path: Path) -> Optional[ContextMetrics]:
         """
         Performs comprehensive AST analysis on a single file.
         """
@@ -55,28 +44,26 @@ class CodeComplexityAnalyzer:
             # 2. API Counts (Functions & Classes)
             functions = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
             classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+            total_apis = len(functions) + len(classes)
             
             # 3. Cyclomatic Complexity (Branching logic)
             complexity = self._calculate_cyclomatic_complexity(tree)
             
             # 4. Documentation Coverage
-            doc_coverage = self._calculate_doc_coverage(tree, len(functions) + len(classes))
+            doc_coverage = self._calculate_doc_coverage(tree, total_apis)
             
             # 5. Context Richness Score (Heuristic)
             # A combination of API density and code size.
             # High score = dense, API-heavy file (likely needs SIGNATURE extraction)
             # Low score = simple script or utility
-            total_apis = len(functions) + len(classes)
             context_richness = min(100.0, (total_apis * 5.0) + (loc / 50.0))
 
-            return ComplexityMetrics(
-                file_path=str(file_path.relative_to(self.repo_path)),
+            return ContextMetrics(
                 loc=loc,
-                function_count=len(functions),
-                class_count=len(classes),
+                api_count=total_apis,
                 cyclomatic_complexity=complexity,
-                docstring_coverage=doc_coverage,
-                context_richness=round(context_richness, 2)
+                documentation_coverage=doc_coverage,
+                context_richness_score=round(context_richness, 2)
             )
 
         except SyntaxError:
@@ -144,7 +131,9 @@ class CodeComplexityAnalyzer:
                 
             metrics = self.analyze_file(file_path)
             if metrics:
-                results[metrics.file_path] = metrics.to_dict()
+                # Map file_path to metrics object
+                rel_path = str(file_path.relative_to(self.repo_path))
+                results[rel_path] = metrics.model_dump()
                 
         logger.info("Complexity analysis complete.")
         return results
@@ -167,7 +156,7 @@ if __name__ == "__main__":
     for f_path, m in sorted_files[:5]:
         print(f"  {f_path}")
         print(f"    - Complexity (CC): {m['cyclomatic_complexity']}")
-        print(f"    - APIs: {m['function_count'] + m['class_count']}")
-        print(f"    - Richness Score: {m['context_richness']}")
-        print(f"    - Doc Coverage: {m['docstring_coverage']}%")
+        print(f"    - APIs: {m['api_count']}")
+        print(f"    - Richness Score: {m['context_richness_score']}")
+        print(f"    - Doc Coverage: {m['documentation_coverage']}%")
         print("-" * 30)

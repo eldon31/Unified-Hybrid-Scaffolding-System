@@ -5,6 +5,12 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Dict, Set, List, Tuple
 import logging
+try:
+    from schemas.extraction_config import DependencyMetrics
+except ImportError:
+    # Fallback if run as script without package context
+    sys.path.append(str(Path(__file__).parents[2]))
+    from schemas.extraction_config import DependencyMetrics
 
 # Configure structured logging (as per observability/metrics.md)
 logging.basicConfig(
@@ -199,13 +205,14 @@ class DependencyGraphBuilder:
             out_degree = len(self.graph.get(file_path, []))
             centrality = in_degree - out_degree
             
-            metrics[file_path] = {
-                "in_degree": in_degree,
-                "out_degree": out_degree,
-                "centrality": centrality,
-                "dependencies": list(self.graph.get(file_path, [])),
-                "dependents": list(self.reverse_graph.get(file_path, []))
-            }
+            metric_obj = DependencyMetrics(
+                in_degree=in_degree,
+                out_degree=out_degree,
+                centrality_score=float(centrality),
+                dependencies=list(self.graph.get(file_path, [])),
+                is_entry_point=False # Default, logic for detection not implemented in original
+            )
+            metrics[file_path] = metric_obj.model_dump()
             
         return metrics
 
