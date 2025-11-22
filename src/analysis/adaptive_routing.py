@@ -105,7 +105,14 @@ class AdaptiveRoutingEngine:
             strategy = "SIGNATURE"
             reason = "High Complexity/Richness (API Focus)"
 
-        # Rule 3: Tests and Boilerplate -> SKIP (Handled by .llmignore usually, but safety net here)
+        # Rule 3: Small/Low-Cost Utility -> FULL
+        # Neither central nor complex, but small enough to include fully without budget impact.
+        # Typically these are simple utilities, DTOs, or config files.
+        elif richness < 20:
+            strategy = "FULL"
+            reason = "Small Utility (Low Cost)"
+
+        # Rule 4: Tests and Boilerplate -> SKIP (Handled by .llmignore usually, but safety net here)
         if "test" in file_path.lower() or "mock" in file_path.lower():
             strategy = "SKIP"
             reason = "Test/Mock file"

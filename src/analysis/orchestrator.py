@@ -6,10 +6,17 @@ import tiktoken
 from tqdm import tqdm
 
 # Import our modules
-from dependency_graph import DependencyGraphBuilder
-from complexity import CodeComplexityAnalyzer
-from adaptive_routing import AdaptiveRoutingEngine
-from extractor import ContentExtractor
+try:
+    from .dependency_graph import DependencyGraphBuilder
+    from .complexity import CodeComplexityAnalyzer
+    from .adaptive_routing import AdaptiveRoutingEngine
+    from .extractor import ContentExtractor
+except ImportError:
+    # Fallback for running directly
+    from dependency_graph import DependencyGraphBuilder
+    from complexity import CodeComplexityAnalyzer
+    from adaptive_routing import AdaptiveRoutingEngine
+    from extractor import ContentExtractor
 
 # Configure logging
 logging.basicConfig(

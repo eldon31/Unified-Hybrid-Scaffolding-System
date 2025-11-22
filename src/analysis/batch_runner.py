@@ -4,7 +4,10 @@ from pathlib import Path
 from time import perf_counter
 
 # Import the single-repo orchestrator
-from orchestrator import ScaffoldOrchestrator
+try:
+    from .orchestrator import ScaffoldOrchestrator
+except ImportError:
+    from orchestrator import ScaffoldOrchestrator
 
 # Configure logging
 logging.basicConfig(
