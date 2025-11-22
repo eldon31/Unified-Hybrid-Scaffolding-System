@@ -2,13 +2,20 @@ import ast
 import logging
 from pathlib import Path
 from typing import Optional
+import sys
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='{"level": "%(levelname)s", "module": "extractor", "message": "%(message)s"}'
-)
-logger = logging.getLogger(__name__)
+try:
+    from .logger import get_logger, setup_logging
+except ImportError:
+    # Fallback
+    sys.path.append(str(Path(__file__).parents[2]))
+    from analysis.logger import get_logger, setup_logging
+
+# Configure logging using shared setup if running as main, else get module logger
+if __name__ == "__main__":
+    logger = setup_logging(__name__)
+else:
+    logger = get_logger(__name__)
 
 class ContentExtractor:
     """

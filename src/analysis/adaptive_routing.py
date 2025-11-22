@@ -10,12 +10,16 @@ except ImportError:
     sys.path.append(str(Path(__file__).parents[2]))
     from schemas.extraction_config import FileExtractionPlan, DependencyMetrics, ContextMetrics
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='{"level": "%(levelname)s", "module": "adaptive_routing", "message": "%(message)s"}'
-)
-logger = logging.getLogger(__name__)
+try:
+    from .logger import get_logger, setup_logging
+except ImportError:
+    from logger import get_logger, setup_logging
+
+# Configure logging using shared setup if running as main, else get module logger
+if __name__ == "__main__":
+    logger = setup_logging(__name__)
+else:
+    logger = get_logger(__name__)
 
 # Define Extraction Strategies
 StrategyType = Literal["FULL", "SIGNATURE", "MINIMAL", "SKIP"]
@@ -115,8 +119,8 @@ class AdaptiveRoutingEngine:
             reason = "Test/Mock file"
 
         # Priority Rank: Higher is better
-        # 3 = FULL, 2 = SIGNATURE, 1 = MINIMAL, 0 = SKIP
-        rank = 3 if strategy == "FULL" else 2 if strategy == "SIGNATURE" else 1 if strategy == "MINIMAL" else 0
+        # 4 = FULL, 3 = SIGNATURE, 2 = MINIMAL, 1 = SKIP
+        rank = 4 if strategy == "FULL" else 3 if strategy == "SIGNATURE" else 2 if strategy == "MINIMAL" else 1
 
         # Handle missing data gracefully for schema validation
         if not comp:

@@ -10,14 +10,10 @@ sys.path.append(str(Path(__file__).parent))
 from analysis.orchestrator import ScaffoldOrchestrator
 from analysis.batch_runner import BatchRunner
 from analysis.static_assets import StaticAssetGenerator
+from analysis.logger import setup_logging
 
 # Configure Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger("CLI")
+logger = setup_logging("CLI")
 
 def run_single(target_path: str):
     """
