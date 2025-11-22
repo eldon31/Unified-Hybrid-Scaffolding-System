@@ -3,8 +3,9 @@ import os
 import sys
 from pathlib import Path
 from collections import defaultdict
-from typing import Dict, Set, List, Tuple
+from typing import Dict, Set, List, Optional
 import logging
+
 try:
     from schemas.extraction_config import DependencyMetrics
 except ImportError:
@@ -41,8 +42,12 @@ class DependencyGraphBuilder:
         self.external_imports: Set[str] = set()
         # Track which files we have successfully analyzed
         self.analyzed_files: Set[str] = set()
+        # Store pre-calculated metrics
+        self.file_metrics: Dict[str, DependencyMetrics] = {}
+        # Track entry points
+        self.entry_points: Set[str] = set()
 
-    def build(self):
+    def build(self) -> Dict[str, Dict]:
         """
         Orchestrates the graph generation process.
         """
@@ -80,7 +85,7 @@ class DependencyGraphBuilder:
 
     def _analyze_file(self, file_path: Path):
         """
-        Parses a single Python file to extract import statements.
+        Parses a single Python file to extract import statements and detect entry points.
         """
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -89,30 +94,64 @@ class DependencyGraphBuilder:
             tree = ast.parse(content)
             self.analyzed_files.add(str(file_path))
             
-            rel_path = file_path.relative_to(self.repo_path)
-            
+            # Check for Entry Point (if __name__ == "__main__":)
+            if self._is_entry_point(tree):
+                try:
+                    rel_path = str(file_path.relative_to(self.repo_path))
+                    self.entry_points.add(rel_path)
+                except ValueError:
+                    pass # Should not happen if file is in repo
+
+            # Extract Imports
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         self._resolve_import(alias.name, file_path)
                 elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        # Handle relative imports (from . import X)
-                        level = node.level
+                    module_name = node.module if node.module else ""
+                    level = node.level
+
+                    for alias in node.names:
                         if level > 0:
-                            self._resolve_relative_import(node.module, level, file_path)
+                            # Relative import
+                            target_name = f"{module_name}.{alias.name}" if module_name else alias.name
+                            self._resolve_relative_import(target_name, level, file_path)
                         else:
-                            self._resolve_import(node.module, file_path)
+                            # Absolute import
+                            # Try full module path (e.g., core.config)
+                            full_name = f"{module_name}.{alias.name}"
+                            if not self._resolve_import(full_name, file_path):
+                                # Fallback: maybe alias is just a member of module
+                                self._resolve_import(module_name, file_path)
                             
         except SyntaxError:
             logger.warning(f"Syntax error parsing {file_path}, skipping.")
         except Exception as e:
             logger.error(f"Failed to parse {file_path}: {str(e)}")
 
-    def _resolve_import(self, module_name: str, source_file: Path):
+    def _is_entry_point(self, tree: ast.AST) -> bool:
+        """
+        Scans the AST for 'if __name__ == "__main__":' block.
+        """
+        for node in ast.walk(tree):
+            if isinstance(node, ast.If):
+                # Check if it is a comparison
+                if isinstance(node.test, ast.Compare):
+                    # Check left side (should be __name__)
+                    left = node.test.left
+                    if isinstance(left, ast.Name) and left.id == "__name__":
+                        # Check comparators (should be "__main__")
+                        if len(node.test.comparators) > 0:
+                            comp = node.test.comparators[0]
+                            if isinstance(comp, ast.Constant) and comp.value == "__main__":
+                                return True
+        return False
+
+    def _resolve_import(self, module_name: str, source_file: Path) -> bool:
         """
         Determines if an import is Internal (part of the repo) or External (pip lib).
         Maps module names (src.core.utils) to file paths (src/core/utils.py).
+        Returns True if it was resolved to an internal file.
         """
         # Convert dot notation to path
         potential_path = module_name.replace(".", os.sep)
@@ -131,10 +170,12 @@ class DependencyGraphBuilder:
         if target:
             # It is an INTERNAL dependency
             self._add_edge(source_file, target)
+            return True
         else:
             # It is an EXTERNAL dependency (e.g., 'os', 'pandas')
             root_pkg = module_name.split(".")[0]
             self.external_imports.add(root_pkg)
+            return False
 
     def _resolve_relative_import(self, module_name: str, level: int, source_file: Path):
         """
@@ -158,7 +199,7 @@ class DependencyGraphBuilder:
             target_path = current_dir / "__init__.py"
             target_pkg = None
 
-        if target_path.exists():
+        if target_path and target_path.exists():
             self._add_edge(source_file, target_path)
         elif target_pkg and target_pkg.exists():
             self._add_edge(source_file, target_pkg)
@@ -183,16 +224,8 @@ class DependencyGraphBuilder:
     def _calculate_metrics(self):
         """
         Derived metric calculation after graph is built.
+        Stores the result in self.file_metrics.
         """
-        # Centrality = In-Degree - Out-Degree
-        # High Centrality = Many depend on it, it depends on few (Core Infrastructure)
-        pass 
-
-    def get_metrics(self) -> Dict[str, Dict]:
-        """
-        Returns the final metrics dictionary for Phase 3 (Routing).
-        """
-        metrics = {}
         all_files = self.analyzed_files | set(self.reverse_graph.keys())
         
         # Normalize paths in analyzed_files to relative for consistency
@@ -209,16 +242,26 @@ class DependencyGraphBuilder:
             out_degree = len(self.graph.get(file_path, []))
             centrality = in_degree - out_degree
             
-            metric_obj = DependencyMetrics(
+            is_entry = file_path in self.entry_points
+
+            self.file_metrics[file_path] = DependencyMetrics(
                 in_degree=in_degree,
                 out_degree=out_degree,
                 centrality_score=float(centrality),
                 dependencies=list(self.graph.get(file_path, [])),
-                is_entry_point=False # Default, logic for detection not implemented in original
+                is_entry_point=is_entry
             )
-            metrics[file_path] = metric_obj.model_dump()
+
+    def get_metrics(self) -> Dict[str, Dict]:
+        """
+        Returns the final metrics dictionary for Phase 3 (Routing).
+        """
+        if not self.file_metrics and self.analyzed_files:
+            self._calculate_metrics()
             
-        return metrics
+        return {
+            k: v.model_dump() for k, v in self.file_metrics.items()
+        }
 
 if __name__ == "__main__":
     # CLI Test Usage
@@ -232,8 +275,8 @@ if __name__ == "__main__":
     print(f"\n--- Analysis Complete for {sys.argv[1]} ---")
     
     # Sort by Centrality (Highest first) to show Core Modules
-    sorted_files = sorted(stats.items(), key=lambda x: x[1]['centrality'], reverse=True)
+    sorted_files = sorted(stats.items(), key=lambda x: x[1]['centrality_score'], reverse=True)
     
     print("\n🏆 Top 5 Core Modules (Highest Centrality):")
     for f, m in sorted_files[:5]:
-        print(f"  [{m['centrality']}] {f} (Imported by {m['in_degree']} files)")
+        print(f"  [{m['centrality_score']}] {f} (Imported by {m['in_degree']} files)")
