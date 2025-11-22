@@ -154,7 +154,7 @@ if __name__ == "__main__":
     print(f"\n--- Complexity Analysis for {sys.argv[1]} ---")
     
     # Sort by Context Richness (Highest First)
-    sorted_files = sorted(repo_metrics.items(), key=lambda x: x[1]['context_richness'], reverse=True)
+    sorted_files = sorted(repo_metrics.items(), key=lambda x: x[1]['context_richness_score'], reverse=True)
     
     print("\n🔥 Top 5 Most Complex/Rich Files:")
     for f_path, m in sorted_files[:5]:
