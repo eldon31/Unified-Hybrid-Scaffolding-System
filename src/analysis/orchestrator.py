@@ -89,16 +89,16 @@ class ScaffoldOrchestrator:
         progress_bar = tqdm(self.decisions, desc="Extracting", unit="file")
         
         for decision in progress_bar:
-            if decision.strategy == "SKIP":
+            if decision.extraction_strategy == "SKIP":
                 continue
             
             # Extract content based on strategy
-            content = self.extractor.extract(decision.file_path, decision.strategy)
+            content = self.extractor.extract(decision.file_path, decision.extraction_strategy)
             
             # Markdown Wrapper
             file_block = (
                 f"\n## File: {decision.file_path}\n"
-                f"**Strategy:** {decision.strategy} | **Reason:** {decision.reason}\n"
+                f"**Strategy:** {decision.extraction_strategy} | **Reason:** {decision.reason}\n"
                 f"```python\n{content}\n```\n"
             )
             
@@ -136,9 +136,10 @@ class ScaffoldOrchestrator:
         Generates the Domain Blueprint based on analysis data.
         """
         # Identify Core Modules (High Centrality)
+        # dep_metrics values are dicts now (dumped models)
         core_modules = sorted(
             dep_metrics.items(), 
-            key=lambda x: x[1]['centrality'], 
+            key=lambda x: x[1]['centrality_score'],
             reverse=True
         )[:5]
         
@@ -155,7 +156,7 @@ class ScaffoldOrchestrator:
 These modules are the structural foundation of the codebase.
 """
         for path, m in core_modules:
-            content += f"* **{path}** (Centrality: {m['centrality']})\n"
+            content += f"* **{path}** (Centrality: {m['centrality_score']})\n"
             
         content += "\n## 2. Complexity Hotspots (High Difficulty)\nThese modules contain the densest logic.\n"
         for path, m in complex_modules:

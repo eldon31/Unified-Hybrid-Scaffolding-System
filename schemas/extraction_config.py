@@ -5,7 +5,7 @@ from typing import Dict, List, Literal, Optional
 # --- Enums and Definitions ---
 
 # Defines the Extraction Strategies used by the Adaptive Routing Decision Engine (Phase 3) [9].
-ExtractionStrategy = Literal["FULL", "SIGNATURE", "MINIMAL", "SKIP"] 
+ExtractionStrategy = Literal["FULL", "SIGNATURE", "MINIMAL", "SKIP"]
 
 # --- Data Models ---
 
@@ -36,9 +36,10 @@ class FileExtractionPlan(BaseModel):
     file_path: str = Field(description="The relative path of the source file.")
     metrics: ContextMetrics = Field(description="The complexity and context richness scores.")
     dependencies: DependencyMetrics = Field(description="The dependency centrality scores.")
-    
+
     # Adaptive Routing Decisions
     extraction_strategy: ExtractionStrategy = Field(description="The chosen strategy: FULL, SIGNATURE, MINIMAL, or SKIP [9].")
+    reason: str = Field(description="The reasoning behind the chosen strategy.")
     priority_rank: conint(ge=1) = Field(description="The file's final ranking for token allocation (higher is more critical).")
 
 class ScaffoldingOutput(BaseModel):

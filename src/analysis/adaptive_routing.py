@@ -1,6 +1,14 @@
 import logging
+import sys
+from pathlib import Path
 from typing import Dict, List, Literal
-from dataclasses import dataclass, asdict
+
+try:
+    from schemas.extraction_config import FileExtractionPlan, DependencyMetrics, ContextMetrics
+except ImportError:
+    # Fallback if run as script without package context
+    sys.path.append(str(Path(__file__).parents[2]))
+    from schemas.extraction_config import FileExtractionPlan, DependencyMetrics, ContextMetrics
 
 # Configure logging
 logging.basicConfig(
@@ -11,18 +19,6 @@ logger = logging.getLogger(__name__)
 
 # Define Extraction Strategies
 StrategyType = Literal["FULL", "SIGNATURE", "MINIMAL", "SKIP"]
-
-@dataclass
-class FileRoutingDecision:
-    """
-    The final decision for a single file.
-    """
-    file_path: str
-    centrality_score: float
-    complexity_score: int
-    context_richness: float
-    strategy: StrategyType
-    reason: str
 
 class AdaptiveRoutingEngine:
     """
@@ -41,7 +37,7 @@ class AdaptiveRoutingEngine:
         self.HIGH_COMPLEXITY_THRESHOLD = 20   # Hard to understand logic
         self.RICHNESS_THRESHOLD = 50.0        # API dense
 
-    def route_all(self) -> List[FileRoutingDecision]:
+    def route_all(self) -> List[FileExtractionPlan]:
         """
         Process all files and assign strategies.
         """
@@ -58,14 +54,14 @@ class AdaptiveRoutingEngine:
         # Sort by priority: FULL > SIGNATURE > MINIMAL
         # Within strategy, sort by Centrality (Importance)
         decisions.sort(key=lambda x: (
-            0 if x.strategy == "FULL" else 1 if x.strategy == "SIGNATURE" else 2,
-            -x.centrality_score
+            0 if x.extraction_strategy == "FULL" else 1 if x.extraction_strategy == "SIGNATURE" else 2,
+            -x.dependencies.centrality_score
         ))
         
         logger.info("Routing complete.")
         return decisions
 
-    def _decide_strategy(self, file_path: str) -> FileRoutingDecision:
+    def _decide_strategy(self, file_path: str) -> FileExtractionPlan:
         """
         The core logic matrix for a single file.
         """
@@ -73,11 +69,12 @@ class AdaptiveRoutingEngine:
         dep = self.dependency_metrics.get(file_path, {})
         comp = self.complexity_metrics.get(file_path, {})
         
-        centrality = dep.get('centrality', 0)
+        # Safe access via dict keys, matching the keys produced by model_dump()
+        centrality = dep.get('centrality_score', 0)
         in_degree = dep.get('in_degree', 0)
         complexity = comp.get('cyclomatic_complexity', 0)
-        richness = comp.get('context_richness', 0)
-        doc_coverage = comp.get('docstring_coverage', 0)
+        richness = comp.get('context_richness_score', 0)
+        doc_coverage = comp.get('documentation_coverage', 0)
 
         # 2. Apply Decision Logic
         strategy: StrategyType = "MINIMAL"
@@ -117,13 +114,23 @@ class AdaptiveRoutingEngine:
             strategy = "SKIP"
             reason = "Test/Mock file"
 
-        return FileRoutingDecision(
+        # Priority Rank: Higher is better
+        # 3 = FULL, 2 = SIGNATURE, 1 = MINIMAL, 0 = SKIP
+        rank = 3 if strategy == "FULL" else 2 if strategy == "SIGNATURE" else 1 if strategy == "MINIMAL" else 0
+
+        # Handle missing data gracefully for schema validation
+        if not comp:
+             comp = {"loc": 0, "api_count": 0, "cyclomatic_complexity": 1, "documentation_coverage": 0.0, "context_richness_score": 0.0}
+        if not dep:
+             dep = {"in_degree": 0, "out_degree": 0, "centrality_score": 0.0, "dependencies": [], "is_entry_point": False}
+
+        return FileExtractionPlan(
             file_path=file_path,
-            centrality_score=centrality,
-            complexity_score=complexity,
-            context_richness=richness,
-            strategy=strategy,
-            reason=reason
+            metrics=ContextMetrics(**comp),
+            dependencies=DependencyMetrics(**dep),
+            extraction_strategy=strategy,
+            reason=reason,
+            priority_rank=rank
         )
 
 if __name__ == "__main__":
@@ -131,15 +138,15 @@ if __name__ == "__main__":
     print("\n--- Testing Adaptive Routing Logic ---")
     
     mock_deps = {
-        "src/core/config.py": {"centrality": 15, "in_degree": 20}, # Core
-        "src/utils/string_helpers.py": {"centrality": 2, "in_degree": 5}, # Utility
-        "src/algo/complex_logic.py": {"centrality": 4, "in_degree": 3} # Complex logic
+        "src/core/config.py": {"centrality_score": 15, "in_degree": 20, "out_degree": 5, "dependencies": [], "is_entry_point": False}, # Core
+        "src/utils/string_helpers.py": {"centrality_score": 2, "in_degree": 5, "out_degree": 3, "dependencies": [], "is_entry_point": False}, # Utility
+        "src/algo/complex_logic.py": {"centrality_score": 4, "in_degree": 3, "out_degree": 1, "dependencies": [], "is_entry_point": False} # Complex logic
     }
     
     mock_comp = {
-        "src/core/config.py": {"cyclomatic_complexity": 5, "context_richness": 30},
-        "src/utils/string_helpers.py": {"cyclomatic_complexity": 3, "context_richness": 10},
-        "src/algo/complex_logic.py": {"cyclomatic_complexity": 50, "context_richness": 80, "docstring_coverage": 90}
+        "src/core/config.py": {"cyclomatic_complexity": 5, "context_richness_score": 30, "loc": 100, "api_count": 10, "documentation_coverage": 80},
+        "src/utils/string_helpers.py": {"cyclomatic_complexity": 3, "context_richness_score": 10, "loc": 50, "api_count": 5, "documentation_coverage": 20},
+        "src/algo/complex_logic.py": {"cyclomatic_complexity": 50, "context_richness_score": 80, "loc": 500, "api_count": 20, "documentation_coverage": 90}
     }
     
     engine = AdaptiveRoutingEngine(mock_deps, mock_comp)
@@ -147,7 +154,6 @@ if __name__ == "__main__":
     
     for d in decisions:
         print(f"File: {d.file_path}")
-        print(f"  Strategy: {d.strategy}")
-        print(f"  Reason:   {d.reason}")
-        print(f"  Metrics:  Cent={d.centrality_score}, Comp={d.complexity_score}")
+        print(f"  Strategy: {d.extraction_strategy}")
+        print(f"  Metrics:  Cent={d.dependencies.centrality_score}, Comp={d.metrics.cyclomatic_complexity}")
         print("-" * 40)
