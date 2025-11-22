@@ -1,13 +1,18 @@
 import os
+import sys
 import logging
 from pathlib import Path
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='{"level": "%(levelname)s", "module": "static_assets", "message": "%(message)s"}'
-)
-logger = logging.getLogger(__name__)
+try:
+    from .logger import get_logger, setup_logging
+except ImportError:
+    from logger import get_logger, setup_logging
+
+# Configure logging using shared setup if running as main, else get module logger
+if __name__ == "__main__":
+    logger = setup_logging(__name__)
+else:
+    logger = get_logger(__name__)
 
 class StaticAssetGenerator:
     """
