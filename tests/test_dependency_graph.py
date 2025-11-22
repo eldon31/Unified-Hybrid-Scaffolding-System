@@ -85,7 +85,7 @@ def test_centrality_calculation(mock_repo):
     # core/config.py is imported by main.py
     # It imports nothing -> Out=0, In=1 -> Centrality = 1
     config = metrics.get("core/config.py")
-    assert config["centrality_score"] >= 1.0
+    assert config["centrality_score"] == 1.0
 
 def test_ignore_logic(mock_repo):
     # Add a test file
