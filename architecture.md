@@ -27,7 +27,8 @@ The system uses an **Adaptive Routing Decision Engine** (Phase 3) which combines
 | :--- | :--- | :--- |
 | **FULL Extraction** | Centrality > X **AND** Complexity < Y | Core foundational modules; extract complete implementation (80/20 rule) [9, 14]. |
 | **SIGNATURE Extraction** | Complexity > Z **OR** High API Count | Complex logic (Cyclomatic Complexity) [7]; extract only function/class signatures + docstrings [9]. |
-| **MINIMAL Extraction** | Low Centrality **AND** Low Complexity | Utility functions; extract only file-level description or skip code blocks [9]. |
+| **FULL Extraction** | Low Complexity **AND** Low Context Richness | Small Utility functions; extract full content as it has low token cost [9]. |
+| **MINIMAL Extraction** | Low Centrality **AND** Low Complexity (but not small) | Larger Utility functions; extract only file-level description or skip code blocks [9]. |
 | **SKIP** | Matches `.llmignore` patterns | Exclusionary specification for noise reduction (e.g., tests, lock files) [11, 15]. |
 
 ## 3. Context Boundaries and Limitations
