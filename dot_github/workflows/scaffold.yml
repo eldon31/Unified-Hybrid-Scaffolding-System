@@ -1,0 +1,43 @@
+name: 🧠 Auto-Generate Context Pack
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'src/**'       # Run when source code changes
+      - '**.py'
+      - '**.ts'
+  workflow_dispatch:   # Allow manual trigger
+
+permissions:
+  contents: write      # Required to commit changes back
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: 🧠 Run Hybrid Scaffolding Engine
+        run: |
+          # Assuming this repo IS the target (single mode)
+          python src/main.py single .
+
+      - name: 💾 Commit & Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs(ai): update repository context pack [skip ci]"
+          file_pattern: '*.md llms.txt'

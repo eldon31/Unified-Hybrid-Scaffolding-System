@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "massdo.repomix-runner",
+    "mono-tony.folder-mapper",
+    "davidanson.vscode-markdownlint",
+    "esbenp.prettier-vscode",
+    "shd101wyy.markdown-preview-enhanced",
+    "yzhang.markdown-all-in-one",
+    "ms-python.python",
+    "eamodio.gitlens",
+    "AlecGhost.tree-sitter-vscode"
+  ]
+}
