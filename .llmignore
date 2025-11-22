@@ -1,0 +1,29 @@
+# Context Boundary Definition: Files to be excluded from AI ingestion (saves tokens and improves focus).
+# This is separate from .gitignore, which excludes build artifacts.
+
+# 1. Dependency & Lock Files (High token cost, zero semantic value for code logic) [3]
+*.lock
+package-lock.json
+yarn.lock
+
+# 2. Test Fixtures, Examples, and Generated Content
+tests/fixtures/**
+test-data/**
+*.test.py
+*.spec.ts
+*.min.js 
+*.css # Repetitive or auto-generated content [5]
+
+# 3. Binary and Large Data Files
+*.bin
+*.log
+*.sqlite
+*.svg # Unless visual analysis is required [4]
+data/raw/** # Immutable source data (high token cost) [6]
+
+# 4. Environment and Metadata
+.env
+.env.*
+.DS_Store
+__pycache__/**
+node_modules/**

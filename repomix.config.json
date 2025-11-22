@@ -1,0 +1,23 @@
+{
+  "output": {
+    "style": "markdown",
+    "filePath": "repository-reference.md",
+    "removeComments": true,
+    "showLineNumbers": false,
+    "topFilesLength": 20 
+  },
+  "ignore": {
+    "customPatterns": [
+      "*.lock",
+      "package-lock.json",
+      "yarn.lock",
+      "*.test.ts",
+      "*.spec.py",
+      "node_modules/**", 
+      "dist/**",
+      "build/**",
+      "*.log",
+      "*.bin"
+    ]
+  }
+}

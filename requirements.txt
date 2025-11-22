@@ -1,0 +1,14 @@
+# Core Analysis
+tiktoken>=0.7.0       # For accurate token budgeting (OpenAI tokenizer)
+pydantic>=2.8.0       # For structured data schemas
+tree-sitter>=0.22.0   # For multi-language parsing (optional but recommended)
+
+# Utilities
+tqdm>=4.66.0          # Progress bars for the CLI
+colorama>=0.4.6       # Colored terminal output for VS Code
+click>=8.1.7          # For building the CLI interface
+gitpython>=3.1.43     # For interacting with Git history (optional)
+
+# Development
+pytest>=8.2.0         # For testing the engine
+black>=24.4.0         # For formatting python code
